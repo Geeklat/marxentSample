@@ -54,36 +54,194 @@
         var scene = null;
         var sceneToRender = null;
         var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
+        
+        var sphereStore = {
+            oldX: -10,
+            oldY: -5,
+            oldZ: 1,
+            currX: -10,
+            currY: -5    
+        };
+
+        var arrowStore = {
+            oldX: 10,
+            oldY: -5,
+            oldZ: 1,
+            currX: 10,
+            currY: -5
+        };
+
+
+        var materialRed;
+        var materialYellow;
+        var triangle;
+
         var createScene = function () {
-    // This creates a basic Babylon Scene object (non-mesh)
-    var scene = new BABYLON.Scene(engine);
+            // This creates a basic Babylon Scene object (non-mesh)
+            var scene = new BABYLON.Scene(engine);
 
-    // This creates and positions a free camera (non-mesh)
-    var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 5, -100), scene);
+            // This creates and positions a free camera (non-mesh)
+            var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 0, -50), scene);
 
-    // This targets the camera to scene origin
-    camera.setTarget(BABYLON.Vector3.Zero());
+            // Enable mouse wheel inputs.
+            camera.inputs.addMouseWheel();
 
-    // This attaches the camera to the canvas
-    camera.attachControl(canvas, true);
+            // This targets the camera to scene origin
+            camera.setTarget(BABYLON.Vector3.Zero());
 
-    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
-    var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+            // This attaches the camera to the canvas
+            camera.attachControl(canvas, true);
 
-    // Default intensity is 1. Let's dim the light a small amount
-    light.intensity = 0.7;
+            // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+            var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-    // Our built-in 'sphere' shape.
-    var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter: 2, segments: 32}, scene);
+            // Default intensity is 1. Let's dim the light a small amount
+            light.intensity = 0.7;
 
-    // Move the sphere upward 1/2 its height
-    sphere.position.y = 1;
+            materialFuschia = new BABYLON.StandardMaterial(scene);
+            materialFuschia.alpha = 1;
+            materialFuschia.diffuseColor = new BABYLON.Color3(0.91, 0.5, 0.82);
 
-    // Our built-in 'ground' shape.
-    var ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 6, height: 6}, scene);
+            materialCyan = new BABYLON.StandardMaterial(scene);
+            materialCyan.alpha = 1;
+            materialCyan.diffuseColor = new BABYLON.Color3(0.29, 0.91, 0.85);
 
-    return scene;
-};
+            materialGreen = new BABYLON.StandardMaterial(scene);
+            materialGreen.alpha = 1;
+            materialGreen.diffuseColor = new BABYLON.Color3(0, 1, 0);
+
+            materialYellow = new BABYLON.StandardMaterial(scene);
+            materialYellow.alpha = 1;
+            materialYellow.diffuseColor = new BABYLON.Color3(1, 0.9, 0);
+
+
+            // Our built-in 'sphere' shape.
+            var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter: 4, segments: 32}, scene);
+
+            sphere.position.y = this.sphereStore.currY;
+            sphere.position.x = this.sphereStore.currX;
+
+            sphere.material = materialFuschia;
+
+            // Our built-in 'sphere' shape.
+            var box = BABYLON.MeshBuilder.CreateBox("box", {size: 3}, scene);
+            box.material = materialYellow;
+
+            var arrow = this.drawArrow(scene);
+            arrow.position.y = this.arrowStore.currY;
+            arrow.position.x = this.arrowStore.currX;
+            arrow.material = materialCyan;
+
+            // Test Trail
+            /*    
+            var trail = new BABYLON.TrailMesh('new', arrow, scene, .5, 100, true);
+            trail.material = materialRed;
+            */
+
+            var pointerDragBehavior = new BABYLON.PointerDragBehavior(new BABYLON.Vector3(1,0,1));//SixDofDragBehavior();
+            // Use drag plane in world space
+            pointerDragBehavior.useObjectOrientationForDragging = false;
+            pointerDragBehavior.onDragEndObservable.add((event)=>{
+                this.newPosition(sphere, arrow, box);
+                
+                sphereStore.oldX = sphere.position.x;
+                sphereStore.oldY = sphere.position.y;
+                arrowStore.oldX = arrowStore.currX;
+                arrowStore.oldY = arrowStore.currY;        
+            })
+            sphere.addBehavior(pointerDragBehavior);
+
+            
+            var animation;
+            setInterval(()=>{
+                animation = BABYLON.Animation.CreateAndStartAnimation('animate', arrow, 'position', 0.6, 0.6, arrow.position.clone(), new BABYLON.Vector3(arrowStore.currX, arrowStore.currY, 0), BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);                
+                // Make the arrow look at the sphere based on a assumption from the problem.
+                arrow.lookAt(new BABYLON.Vector3(sphere.position.x,sphere.position.y,sphere.position.z));                
+            }, 50);
+            
+            
+            return scene;
+        };
+
+        function drawArrow(scene) {
+            const arrowHead =  [
+                    new BABYLON.Vector3(0, 0, 0),
+                    new BABYLON.Vector3(0, 5, 0),
+                    new BABYLON.Vector3(5, 0, 0)			
+            ];
+            arrowHead.push(arrowHead[0]);
+
+            const arrowBody =  [
+                    new BABYLON.Vector3(0, 0, 0),
+                    new BABYLON.Vector3(0, 6, 0),
+                    new BABYLON.Vector3(3, 6, 0),
+                    new BABYLON.Vector3(3, 0, 0)			
+            ];
+            arrowBody.push(arrowBody[0]);
+
+            // Extrusion path for depth
+            const myPath = [
+                    new BABYLON.Vector3(0, 1, 0),
+                    new BABYLON.Vector3(0, 3, 0)
+            ];	
+            
+            const extrusionAH = BABYLON.MeshBuilder.ExtrudeShape("arrowHead", {
+                shape: arrowHead, path: myPath, cap: BABYLON.Mesh.CAP_ALL, sideOrientation: BABYLON.Mesh.DOUBLESIDE}, scene);
+
+            const extrusionAB = BABYLON.MeshBuilder.ExtrudeShape("arrowBody", {
+                shape: arrowBody, path: myPath, cap: BABYLON.Mesh.CAP_ALL, sideOrientation: BABYLON.Mesh.DOUBLESIDE}, scene);
+
+            // Adjust the body to match the arrowHead
+            extrusionAB.rotate(new BABYLON.Vector3(0,1,0), -(Math.PI/4));
+            extrusionAB.position.x = -2.3;    
+
+            return(BABYLON.Mesh.MergeMeshes([extrusionAH, extrusionAB]));
+        }
+
+        function drawTriangle() {
+            //triangle.dispose();
+            triangle = null;    
+            triangle = new BABYLON.Mesh("triangle", scene);
+
+            var positions = [sphereStore.currX, sphereStore.currY, 0, 
+                            arrowStore.oldX, arrowStore.oldY, 0, 
+                            arrowStore.currX, arrowStore.currY, 0];
+            var indices = [0, 1, 2];
+                
+            var vertexData = new BABYLON.VertexData();
+
+            vertexData.positions = positions;
+            vertexData.indices = indices;	
+            vertexData.applyToMesh(triangle, true);
+            triangle.bakeCurrentTransformIntoVertices();
+            // Draw a transparent triangle to use for collision
+            var material = new BABYLON.StandardMaterial(scene);
+            material.alpha = 0;
+            //material.diffuseColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+            triangle.material = material;    
+        }
+
+        function newPosition(sphere, arrow, box) {
+            arrowStore.currX = (sphere.position.x - sphereStore.currX) + 0.5;
+            arrowStore.currY = (sphere.position.y - sphereStore.currY) + 0.5;
+
+            sphereStore.currX = sphere.position.x;
+            sphereStore.currY = sphere.position.y;
+
+            this.drawTriangle();
+
+            // Check for collision
+            if (box.intersectsMesh(triangle, true)) 
+            {
+                box.material = materialGreen;
+            } 
+            else {
+                box.material = materialYellow;
+            }
+
+            scene.render();
+        };
+
                 window.initFunction = async function() {
                     
                     
